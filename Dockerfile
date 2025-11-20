@@ -1,0 +1,61 @@
+# Use a stable Ubuntu LTS base image
+FROM ubuntu:jammy
+
+# Set environment variables for the WARP client installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV GOST_VERSION=2.11.5
+
+# --- 1. Install Dependencies and WARP Client ---
+RUN apt update && \
+    apt install -y --no-install-recommends \
+        curl \
+        wget \
+        gnupg \
+        iproute2 \
+        net-tools \
+        dumb-init \
+        ca-certificates \
+        dbus \
+        systemd \
+        systemd-sysv && \
+    \
+    # Detect architecture
+    ARCH=$(dpkg --print-architecture) && \
+    \
+    # Add Cloudflare GPG key
+    curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg && \
+    \
+    # Add Cloudflare WARP repository (using detected architecture)
+    echo "deb [arch=${ARCH} signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ focal main" | tee /etc/apt/sources.list.d/cloudflare-warp.list && \
+    \
+    # Install WARP client
+    apt update && \
+    apt install -y --no-install-recommends cloudflare-warp && \
+    \
+    # --- 2. Install Gost (Proxy Relay Tool) ---
+    # Download and install gost (v2.x uses different naming)
+    GOST_ARCH=$([ "${ARCH}" = "amd64" ] && echo "amd64" || echo "armv8") && \
+    wget -O /tmp/gost.gz "https://github.com/ginuerzh/gost/releases/download/v${GOST_VERSION}/gost-linux-${GOST_ARCH}-${GOST_VERSION}.gz" && \
+    gunzip /tmp/gost.gz && \
+    mv /tmp/gost /usr/local/bin/ && \
+    chmod +x /usr/local/bin/gost && \
+    \
+    # Clean up
+    apt autoremove -y && \
+    apt clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# The WARP SOCKS5 proxy runs on localhost:1080 by default.
+# We expose port 40000 externally and use gost to forward to WARP's 127.0.0.1:1080
+ENV PROXY_PORT=40000
+
+# Expose the SOCKS5 proxy port (external port)
+EXPOSE ${PROXY_PORT}
+
+# Set the entrypoint to run multiple services (WARP daemon + proxy relay)
+# The entrypoint script will handle WARP registration and connection.
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["/usr/local/bin/entrypoint.sh"]
