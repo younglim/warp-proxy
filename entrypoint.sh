@@ -96,8 +96,10 @@ HTTP_PORT=${HTTP_PROXY_PORT:-40001}
 # '@' or ':' characters) or pre-encoded. If not set, the listener is open.
 if [ -n "${GOST_USERNAME}" ] && [ -n "${GOST_PASSWORD}" ]; then
     AUTH="${GOST_USERNAME}:${GOST_PASSWORD}@"
+    echo "Authentication enabled for user: ${GOST_USERNAME}"
 else
     AUTH=""
+    echo "WARNING: No authentication configured (GOST_USERNAME or GOST_PASSWORD not set)"
 fi
 
 # Detect if WARP SOCKS5 is listening on ::1:1080

@@ -29,8 +29,8 @@ services:
       - HTTP_PROXY_PORT=40001
       - RUST_LOG=info  # Change from 'error' to 'info' to hide this specific error
       # Optional: Uncomment and set credentials to enable authentication
-      # - GOST_USERNAME=your-username-here
-      # - GOST_PASSWORD=your-password-here
+      - GOST_USERNAME=${GOST_USERNAME:-}
+      - GOST_PASSWORD=${GOST_PASSWORD:-}
     security_opt:
       - seccomp:unconfined
     # Optional: Add a healthcheck for the proxy port
