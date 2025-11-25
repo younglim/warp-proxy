@@ -146,7 +146,7 @@ if ip -6 addr show | grep -q 'inet6'; then
     echo "Starting SOCKS5 gost with listener ${LISTEN_ADDR} forwarding to ${FORWARD_ADDR}"
     start_gost_proxy "SOCKS5-dual" -L "${LISTEN_ADDR}" -F "${FORWARD_ADDR}"
 
-    HTTP_LISTEN_ADDR="http://${AUTH}[::]:${HTTP_PORT}"
+    HTTP_LISTEN_ADDR="http://${AUTH}[::]:${HTTP_PORT}?resolver=prefer_ipv6"
     echo "Starting HTTP proxy on ${HTTP_LISTEN_ADDR} chaining through ${HTTP_FORWARD_ADDR}"
     start_gost_proxy "HTTP-dual" -L "${HTTP_LISTEN_ADDR}" -F "${HTTP_FORWARD_ADDR}"
 else
@@ -155,7 +155,7 @@ else
     echo "Starting SOCKS5 gost with listener ${LISTEN_ADDR} forwarding to ${FORWARD_ADDR}"
     start_gost_proxy "SOCKS5-IPv4" -L "${LISTEN_ADDR}" -F "${FORWARD_ADDR}"
 
-    HTTP_LISTEN_ADDR="http://${AUTH}0.0.0.0:${HTTP_PORT}"
+    HTTP_LISTEN_ADDR="http://${AUTH}0.0.0.0:${HTTP_PORT}?resolver=prefer_ipv6"
     echo "Starting HTTP proxy on ${HTTP_LISTEN_ADDR} chaining through ${HTTP_FORWARD_ADDR}"
     start_gost_proxy "HTTP-IPv4" -L "${HTTP_LISTEN_ADDR}" -F "${HTTP_FORWARD_ADDR}"
 fi
