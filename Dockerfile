@@ -45,6 +45,9 @@ RUN apt update && \
     mv /tmp/gost /usr/local/bin/ && \
     chmod +x /usr/local/bin/gost && \
     \
+    # Install gettext-base for envsubst (if not already installed)
+    apt-get update && apt-get install -y gettext-base && rm -rf /var/lib/apt/lists/* && \
+    \
     # Clean up
     apt autoremove -y && \
     apt clean && \
@@ -62,6 +65,9 @@ EXPOSE ${PROXY_PORT} ${HTTP_PROXY_PORT}
 # The entrypoint script will handle WARP registration and connection.
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Copy gost config template
+COPY gost.yaml /app/gost.yaml
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 CMD ["/usr/local/bin/entrypoint.sh"]

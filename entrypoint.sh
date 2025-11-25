@@ -91,77 +91,43 @@ echo "Starting SOCKS5 relay on 0.0.0.0:40000 forwarding to 127.0.0.1:1080..."
 PORT=${PROXY_PORT:-40000}
 HTTP_PORT=${HTTP_PROXY_PORT:-40001}
 
-# If username and password are provided, include them in the listener URL so
-# gost enforces authentication. Note: credentials should be URL-safe (avoid
-# '@' or ':' characters) or pre-encoded. If not set, the listener is open.
+# Set defaults for auth (empty string disables auth in gost when both are empty)
+export GOST_USERNAME="${GOST_USERNAME:-}"
+export GOST_PASSWORD="${GOST_PASSWORD:-}"
+
 if [ -n "${GOST_USERNAME}" ] && [ -n "${GOST_PASSWORD}" ]; then
-    AUTH="${GOST_USERNAME}:${GOST_PASSWORD}@"
     echo "Authentication enabled for user: ${GOST_USERNAME}"
 else
-    AUTH=""
     echo "WARNING: No authentication configured (GOST_USERNAME or GOST_PASSWORD not set)"
 fi
 
 # Detect if WARP SOCKS5 is listening on ::1:1080
 if ss -ltn | grep -q 'LISTEN.*[::]:1080'; then
-    FORWARD_ADDR="socks5://[::1]:1080?prefer=ipv6"
+    export WARP_SOCKS5_ADDR="[::1]:1080"
 else
-    FORWARD_ADDR="socks5://127.0.0.1:1080?prefer=ipv6"
+    export WARP_SOCKS5_ADDR="127.0.0.1:1080"
 fi
-
-# Use the same forward address for HTTP proxy (prefer IPv6 already set)
-HTTP_FORWARD_ADDR="${FORWARD_ADDR}"
-
-declare -a PROXY_PIDS=()
-
-cleanup() {
-    echo "Shutting down proxy processes..."
-    for pid in "${PROXY_PIDS[@]}"; do
-        kill "$pid" 2>/dev/null || true
-    done
-}
-trap cleanup EXIT INT TERM
-
-start_gost_proxy() {
-    local name="$1"
-    shift
-    (
-        set +e
-        while true; do
-            echo "[$name] starting gost: gost $*"
-            stdbuf -oL gost "$@" 2>&1 | sed "s/^/[$name] /"
-            local exit_code=${PIPESTATUS[0]}
-            echo "[$name] gost exited with code ${exit_code}, restarting in 3s..."
-            sleep 3
-        done
-    ) &
-    PROXY_PIDS+=("$!")
-}
 
 # Detect if IPv6 is available in the container
 if ip -6 addr show | grep -q 'inet6'; then
     echo "IPv6 detected, binding SOCKS5/HTTP on [::] (dual-stack)."
-    LISTEN_ADDR="socks5://${AUTH}[::]:${PORT}"
-    echo "Starting SOCKS5 gost with listener ${LISTEN_ADDR} forwarding to ${FORWARD_ADDR}"
-    start_gost_proxy "SOCKS5-dual" -L "${LISTEN_ADDR}" -F "${FORWARD_ADDR}"
-
-    HTTP_LISTEN_ADDR="http://${AUTH}[::]:${HTTP_PORT}"
-    echo "Starting HTTP proxy on ${HTTP_LISTEN_ADDR} chaining through ${HTTP_FORWARD_ADDR}"
-    start_gost_proxy "HTTP-dual" -L "${HTTP_LISTEN_ADDR}" -F "${HTTP_FORWARD_ADDR}"
+    export SOCKS5_LISTEN="[::]:${PORT}"
+    export HTTP_LISTEN="[::]:${HTTP_PORT}"
 else
     echo "IPv6 not detected, binding SOCKS5/HTTP on 0.0.0.0."
-    LISTEN_ADDR="socks5://${AUTH}0.0.0.0:${PORT}"
-    echo "Starting SOCKS5 gost with listener ${LISTEN_ADDR} forwarding to ${FORWARD_ADDR}"
-    start_gost_proxy "SOCKS5-IPv4" -L "${LISTEN_ADDR}" -F "${FORWARD_ADDR}"
-
-    HTTP_LISTEN_ADDR="http://${AUTH}0.0.0.0:${HTTP_PORT}"
-    echo "Starting HTTP proxy on ${HTTP_LISTEN_ADDR} chaining through ${HTTP_FORWARD_ADDR}"
-    start_gost_proxy "HTTP-IPv4" -L "${HTTP_LISTEN_ADDR}" -F "${HTTP_FORWARD_ADDR}"
+    export SOCKS5_LISTEN="0.0.0.0:${PORT}"
+    export HTTP_LISTEN="0.0.0.0:${HTTP_PORT}"
 fi
 
-echo "Proxy servers started:"
-echo "  - SOCKS5: 0.0.0.0:${PORT}"
-echo "  - HTTP: 0.0.0.0:${HTTP_PORT}"
+# Process the gost config template
+GOST_CONFIG="/tmp/gost.yaml"
+envsubst < /app/gost.yaml > "${GOST_CONFIG}"
+
+echo "Generated gost config:"
+cat "${GOST_CONFIG}"
+
+echo "Starting gost with config file..."
+exec gost -C "${GOST_CONFIG}"
 
 # Keep container running and show logs
 wait

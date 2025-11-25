@@ -1,0 +1,42 @@
+resolvers:
+  - name: resolver-ipv6
+    nameservers:
+      - addr: "1.1.1.1:53"
+      - addr: "[2606:4700:4700::1111]:53"
+    prefer: ipv6
+
+chains:
+  - name: chain-warp
+    hops:
+      - name: hop-0
+        nodes:
+          - name: warp-upstream
+            addr: "${WARP_SOCKS5_ADDR}"
+            connector:
+              type: socks5
+            dialer:
+              type: tcp
+            resolver: resolver-ipv6
+
+services:
+  - name: socks5-service
+    addr: "${SOCKS5_LISTEN}"
+    handler:
+      type: socks5
+      auth:
+        username: "${GOST_USERNAME}"
+        password: "${GOST_PASSWORD}"
+      chain: chain-warp
+    listener:
+      type: tcp
+
+  - name: http-service
+    addr: "${HTTP_LISTEN}"
+    handler:
+      type: http
+      auth:
+        username: "${GOST_USERNAME}"
+        password: "${GOST_PASSWORD}"
+      chain: chain-warp
+    listener:
+      type: tcp
