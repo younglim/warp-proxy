@@ -33,10 +33,15 @@ RUN apt update && \
     apt install -y --no-install-recommends cloudflare-warp && \
     \
     # --- 2. Install Gost (Proxy Relay Tool) ---
-    # Download and install gost (v2.x uses different naming)
-    GOST_ARCH=$([ "${ARCH}" = "amd64" ] && echo "amd64" || echo "armv8") && \
-    wget -O /tmp/gost.gz "https://github.com/ginuerzh/gost/releases/download/v${GOST_VERSION}/gost-linux-${GOST_ARCH}-${GOST_VERSION}.gz" && \
-    gunzip /tmp/gost.gz && \
+    # Download and install gost v3.x (tarball per architecture)
+    case "${ARCH}" in \
+        amd64) GOST_ARCH=amd64 ;; \
+        arm64|aarch64) GOST_ARCH=arm64 ;; \
+        *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
+    esac && \
+    GOST_TAR="gost_${GOST_VERSION}_linux_${GOST_ARCH}.tar.gz" && \
+    wget -O "/tmp/${GOST_TAR}" "https://github.com/go-gost/gost/releases/download/v${GOST_VERSION}/${GOST_TAR}" && \
+    tar -xzf "/tmp/${GOST_TAR}" -C /tmp gost && \
     mv /tmp/gost /usr/local/bin/ && \
     chmod +x /usr/local/bin/gost && \
     \
