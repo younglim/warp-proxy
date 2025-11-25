@@ -3,7 +3,7 @@ FROM ubuntu:jammy
 
 # Set environment variables for the WARP client installation
 ENV DEBIAN_FRONTEND=noninteractive
-ENV GOST_VERSION=2.11.5
+ENV GOST_VERSION=3.2.6
 
 # --- 1. Install Dependencies and WARP Client ---
 RUN apt update && \

@@ -136,12 +136,12 @@ start_gost_proxy() {
 # Start SOCKS5 proxy (IPv4)
 LISTEN_ADDR="socks5://${AUTH}0.0.0.0:${PORT}"
 echo "Starting SOCKS5 gost with listener ${LISTEN_ADDR} forwarding to ${FORWARD_ADDR}"
-start_gost_proxy "SOCKS5-IPv4" -L "${LISTEN_ADDR}" -F "${FORWARD_ADDR}" --prefer-ipv6
+start_gost_proxy "SOCKS5-IPv4" -L "${LISTEN_ADDR}" -F "${FORWARD_ADDR}"
 
 # Start HTTP proxy (IPv4) - chain through SOCKS5
 HTTP_LISTEN_ADDR="http://${AUTH}0.0.0.0:${HTTP_PORT}"
 echo "Starting HTTP proxy on ${HTTP_LISTEN_ADDR} chaining through ${FORWARD_ADDR}"
-start_gost_proxy "HTTP-IPv4" -L "${HTTP_LISTEN_ADDR}" -F "${FORWARD_ADDR}" --prefer-ipv6
+start_gost_proxy "HTTP-IPv4" -L "${HTTP_LISTEN_ADDR}" -F "${FORWARD_ADDR}" --resolver prefer_ipv6
 
 # Detect if IPv6 is available in the container
 if ip -6 addr show | grep -q 'inet6'; then
@@ -153,7 +153,7 @@ if ip -6 addr show | grep -q 'inet6'; then
 
     # Start HTTP for IPv6 - chain through SOCKS5
     HTTP_IPV6_LISTEN_ADDR="http://${AUTH}[::]:${HTTP_PORT}"
-    start_gost_proxy "HTTP-IPv6" -L "${HTTP_IPV6_LISTEN_ADDR}" -F "${FORWARD_ADDR}"
+    start_gost_proxy "HTTP-IPv6" -L "${HTTP_IPV6_LISTEN_ADDR}" -F "${FORWARD_ADDR}" --resolver prefer_ipv6
 fi
 
 echo "Proxy servers started:"
