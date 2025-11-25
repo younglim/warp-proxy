@@ -107,6 +107,12 @@ else
     FORWARD_ADDR="socks5://127.0.0.1:1080"
 fi
 
+if echo "${FORWARD_ADDR}" | grep -q '?'; then
+    HTTP_FORWARD_ADDR="${FORWARD_ADDR}&resolver=prefer_ipv6"
+else
+    HTTP_FORWARD_ADDR="${FORWARD_ADDR}?resolver=prefer_ipv6"
+fi
+
 declare -a PROXY_PIDS=()
 
 cleanup() {
@@ -133,27 +139,25 @@ start_gost_proxy() {
     PROXY_PIDS+=("$!")
 }
 
-# Start SOCKS5 proxy (IPv4)
-LISTEN_ADDR="socks5://${AUTH}0.0.0.0:${PORT}"
-echo "Starting SOCKS5 gost with listener ${LISTEN_ADDR} forwarding to ${FORWARD_ADDR}"
-start_gost_proxy "SOCKS5-IPv4" -L "${LISTEN_ADDR}" -F "${FORWARD_ADDR}"
-
-# Start HTTP proxy (IPv4) - chain through SOCKS5
-HTTP_LISTEN_ADDR="http://${AUTH}0.0.0.0:${HTTP_PORT}"
-echo "Starting HTTP proxy on ${HTTP_LISTEN_ADDR} chaining through ${FORWARD_ADDR}"
-start_gost_proxy "HTTP-IPv4" -L "${HTTP_LISTEN_ADDR}" -F "${FORWARD_ADDR}" --resolver prefer_ipv6
-
 # Detect if IPv6 is available in the container
 if ip -6 addr show | grep -q 'inet6'; then
-    echo "IPv6 detected, starting gost on [::]:${PORT} and [::]:${HTTP_PORT} as well."
-    
-    # Start SOCKS5 for IPv6
-    IPV6_LISTEN_ADDR="socks5://${AUTH}[::]:${PORT}"
-    start_gost_proxy "SOCKS5-IPv6" -L "${IPV6_LISTEN_ADDR}" -F "${FORWARD_ADDR}"
+    echo "IPv6 detected, binding SOCKS5/HTTP on [::] (dual-stack)."
+    LISTEN_ADDR="socks5://${AUTH}[::]:${PORT}"
+    echo "Starting SOCKS5 gost with listener ${LISTEN_ADDR} forwarding to ${FORWARD_ADDR}"
+    start_gost_proxy "SOCKS5-dual" -L "${LISTEN_ADDR}" -F "${FORWARD_ADDR}"
 
-    # Start HTTP for IPv6 - chain through SOCKS5
-    HTTP_IPV6_LISTEN_ADDR="http://${AUTH}[::]:${HTTP_PORT}"
-    start_gost_proxy "HTTP-IPv6" -L "${HTTP_IPV6_LISTEN_ADDR}" -F "${FORWARD_ADDR}" --resolver prefer_ipv6
+    HTTP_LISTEN_ADDR="http://${AUTH}[::]:${HTTP_PORT}"
+    echo "Starting HTTP proxy on ${HTTP_LISTEN_ADDR} chaining through ${HTTP_FORWARD_ADDR}"
+    start_gost_proxy "HTTP-dual" -L "${HTTP_LISTEN_ADDR}" -F "${HTTP_FORWARD_ADDR}"
+else
+    echo "IPv6 not detected, binding SOCKS5/HTTP on 0.0.0.0."
+    LISTEN_ADDR="socks5://${AUTH}0.0.0.0:${PORT}"
+    echo "Starting SOCKS5 gost with listener ${LISTEN_ADDR} forwarding to ${FORWARD_ADDR}"
+    start_gost_proxy "SOCKS5-IPv4" -L "${LISTEN_ADDR}" -F "${FORWARD_ADDR}"
+
+    HTTP_LISTEN_ADDR="http://${AUTH}0.0.0.0:${HTTP_PORT}"
+    echo "Starting HTTP proxy on ${HTTP_LISTEN_ADDR} chaining through ${HTTP_FORWARD_ADDR}"
+    start_gost_proxy "HTTP-IPv4" -L "${HTTP_LISTEN_ADDR}" -F "${HTTP_FORWARD_ADDR}"
 fi
 
 echo "Proxy servers started:"
