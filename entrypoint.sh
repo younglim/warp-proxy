@@ -72,7 +72,45 @@ fi
 echo "Cloudflare WARP is connected. SOCKS5 is running on 127.0.0.1:1080."
 warp-cli --accept-tos status 2>/dev/null
 
+# Check WARP IPv6 connectivity
+echo "Checking WARP IPv6 connectivity..."
+WARP_IPV6=$(warp-cli --accept-tos status | grep -Eo 'IPv6: [0-9a-fA-F:]+')
+echo "WARP IPv6 status: $WARP_IPV6"
+
+# Test outbound IPv6 connectivity through WARP
+echo "Testing outbound IPv6 connectivity via WARP..."
+curl -6 -s https://[2606:4700:4700::1111]/cdn-cgi/trace || echo "IPv6 outbound test failed"
+
 # Start the gost relay to expose the SOCKS5 proxy to 0.0.0.0
 echo "Starting SOCKS5 relay on 0.0.0.0:40000 forwarding to 127.0.0.1:1080..."
-# Remove -D flag to reduce verbosity, redirect warnings to /dev/null
-exec gost -L "socks5://:40000" -F "socks5://127.0.0.1:1080" 2>&1 | grep -vE "WARN|power_notifier" || true
+# Use PROXY_PORT env var if provided (default 40000)
+PORT=${PROXY_PORT:-40000}
+
+# If username and password are provided, include them in the listener URL so
+# gost enforces authentication. Note: credentials should be URL-safe (avoid
+# '@' or ':' characters) or pre-encoded. If not set, the listener is open.
+if [ -n "${GOST_USERNAME}" ] && [ -n "${GOST_PASSWORD}" ]; then
+    AUTH="${GOST_USERNAME}:${GOST_PASSWORD}@"
+else
+    AUTH=""
+fi
+
+# Detect if WARP SOCKS5 is listening on ::1:1080
+if ss -ltn | grep -q 'LISTEN.*[::]:1080'; then
+    FORWARD_ADDR="socks5://[::1]:1080"
+else
+    FORWARD_ADDR="socks5://127.0.0.1:1080"
+fi
+
+# Detect if IPv6 is available in the container
+if ip -6 addr show | grep -q 'inet6'; then
+    IPV6_LISTEN_ADDR="socks5://${AUTH}[::]:${PORT}"
+    echo "IPv6 detected, starting gost on [::]:${PORT} as well."
+    # Start gost for IPv6 in background, using correct FORWARD_ADDR
+    gost -L "${IPV6_LISTEN_ADDR}" -F "${FORWARD_ADDR}" 2>&1 | grep -vE "WARN|power_notifier" &
+fi
+
+LISTEN_ADDR="socks5://${AUTH}0.0.0.0:${PORT}"
+
+echo "Starting gost with listener ${LISTEN_ADDR} forwarding to ${FORWARD_ADDR}"
+exec gost -L "${LISTEN_ADDR}" -F "${FORWARD_ADDR}" --prefer-ipv6 2>&1 | grep -vE "WARN|power_notifier" || true
