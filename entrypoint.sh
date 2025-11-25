@@ -108,9 +108,9 @@ LISTEN_ADDR="socks5://${AUTH}0.0.0.0:${PORT}"
 echo "Starting SOCKS5 gost with listener ${LISTEN_ADDR} forwarding to ${FORWARD_ADDR}"
 gost -L "${LISTEN_ADDR}" -F "${FORWARD_ADDR}" --prefer-ipv6 2>&1 | grep -vE "WARN|power_notifier" &
 
-# Start HTTP proxy (IPv4)
+# Start HTTP proxy (IPv4) - chain through SOCKS5
 HTTP_LISTEN_ADDR="http://${AUTH}0.0.0.0:${HTTP_PORT}"
-echo "Starting HTTP proxy on ${HTTP_LISTEN_ADDR} forwarding to ${FORWARD_ADDR}"
+echo "Starting HTTP proxy on ${HTTP_LISTEN_ADDR} chaining through ${FORWARD_ADDR}"
 gost -L "${HTTP_LISTEN_ADDR}" -F "${FORWARD_ADDR}" --prefer-ipv6 2>&1 | grep -vE "WARN|power_notifier" &
 
 # Detect if IPv6 is available in the container
@@ -121,7 +121,7 @@ if ip -6 addr show | grep -q 'inet6'; then
     IPV6_LISTEN_ADDR="socks5://${AUTH}[::]:${PORT}"
     gost -L "${IPV6_LISTEN_ADDR}" -F "${FORWARD_ADDR}" 2>&1 | grep -vE "WARN|power_notifier" &
     
-    # Start HTTP for IPv6
+    # Start HTTP for IPv6 - chain through SOCKS5
     HTTP_IPV6_LISTEN_ADDR="http://${AUTH}[::]:${HTTP_PORT}"
     gost -L "${HTTP_IPV6_LISTEN_ADDR}" -F "${FORWARD_ADDR}" 2>&1 | grep -vE "WARN|power_notifier" &
 fi
