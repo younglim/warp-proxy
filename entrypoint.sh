@@ -70,16 +70,20 @@ if [ "$(warp-cli --accept-tos status | grep -c 'Connected')" -eq 0 ]; then
 fi
 
 echo "Cloudflare WARP is connected. SOCKS5 is running on 127.0.0.1:1080."
-warp-cli --accept-tos status 2>/dev/null
+WARP_STATUS="$(warp-cli --accept-tos status 2>/dev/null || true)"
 
 # Check WARP IPv6 connectivity
 echo "Checking WARP IPv6 connectivity..."
-WARP_IPV6=$(warp-cli --accept-tos status | grep -Eo 'IPv6: [0-9a-fA-F:]+')
-echo "WARP IPv6 status: $WARP_IPV6"
+WARP_IPV6=$(echo "${WARP_STATUS}" | grep -Eo 'IPv6: [0-9a-fA-F:]+' || true)
 
-# Test outbound IPv6 connectivity through WARP
-echo "Testing outbound IPv6 connectivity via WARP..."
-curl -6 -s https://[2606:4700:4700::1111]/cdn-cgi/trace || echo "IPv6 outbound test failed"
+if [ -n "${WARP_IPV6}" ]; then
+    echo "WARP IPv6 status: ${WARP_IPV6}"
+    echo "Testing outbound IPv6 connectivity via WARP..."
+    curl -6 -s https://[2606:4700:4700::1111]/cdn-cgi/trace || echo "IPv6 outbound test failed"
+else
+    echo "WARP IPv6 status: unavailable (continuing without IPv6)"
+    echo "Skipping IPv6 outbound test because no IPv6 address was reported."
+fi
 
 # Start the gost relay to expose the SOCKS5 proxy to 0.0.0.0
 echo "Starting SOCKS5 relay on 0.0.0.0:40000 forwarding to 127.0.0.1:1080..."
@@ -103,15 +107,41 @@ else
     FORWARD_ADDR="socks5://127.0.0.1:1080"
 fi
 
+declare -a PROXY_PIDS=()
+
+cleanup() {
+    echo "Shutting down proxy processes..."
+    for pid in "${PROXY_PIDS[@]}"; do
+        kill "$pid" 2>/dev/null || true
+    done
+}
+trap cleanup EXIT INT TERM
+
+start_gost_proxy() {
+    local name="$1"
+    shift
+    (
+        set +e
+        while true; do
+            echo "[$name] starting gost: gost $*"
+            stdbuf -oL gost "$@" 2>&1 | sed "s/^/[$name] /"
+            local exit_code=${PIPESTATUS[0]}
+            echo "[$name] gost exited with code ${exit_code}, restarting in 3s..."
+            sleep 3
+        done
+    ) &
+    PROXY_PIDS+=("$!")
+}
+
 # Start SOCKS5 proxy (IPv4)
 LISTEN_ADDR="socks5://${AUTH}0.0.0.0:${PORT}"
 echo "Starting SOCKS5 gost with listener ${LISTEN_ADDR} forwarding to ${FORWARD_ADDR}"
-gost -L "${LISTEN_ADDR}" -F "${FORWARD_ADDR}" --prefer-ipv6 2>&1 | grep -vE "WARN|power_notifier" &
+start_gost_proxy "SOCKS5-IPv4" -L "${LISTEN_ADDR}" -F "${FORWARD_ADDR}" --prefer-ipv6
 
 # Start HTTP proxy (IPv4) - chain through SOCKS5
 HTTP_LISTEN_ADDR="http://${AUTH}0.0.0.0:${HTTP_PORT}"
 echo "Starting HTTP proxy on ${HTTP_LISTEN_ADDR} chaining through ${FORWARD_ADDR}"
-gost -L "${HTTP_LISTEN_ADDR}" -F "${FORWARD_ADDR}" --prefer-ipv6 2>&1 | grep -vE "WARN|power_notifier" &
+start_gost_proxy "HTTP-IPv4" -L "${HTTP_LISTEN_ADDR}" -F "${FORWARD_ADDR}" --prefer-ipv6
 
 # Detect if IPv6 is available in the container
 if ip -6 addr show | grep -q 'inet6'; then
@@ -119,11 +149,11 @@ if ip -6 addr show | grep -q 'inet6'; then
     
     # Start SOCKS5 for IPv6
     IPV6_LISTEN_ADDR="socks5://${AUTH}[::]:${PORT}"
-    gost -L "${IPV6_LISTEN_ADDR}" -F "${FORWARD_ADDR}" 2>&1 | grep -vE "WARN|power_notifier" &
-    
+    start_gost_proxy "SOCKS5-IPv6" -L "${IPV6_LISTEN_ADDR}" -F "${FORWARD_ADDR}"
+
     # Start HTTP for IPv6 - chain through SOCKS5
     HTTP_IPV6_LISTEN_ADDR="http://${AUTH}[::]:${HTTP_PORT}"
-    gost -L "${HTTP_IPV6_LISTEN_ADDR}" -F "${FORWARD_ADDR}" 2>&1 | grep -vE "WARN|power_notifier" &
+    start_gost_proxy "HTTP-IPv6" -L "${HTTP_IPV6_LISTEN_ADDR}" -F "${FORWARD_ADDR}"
 fi
 
 echo "Proxy servers started:"
