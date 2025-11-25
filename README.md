@@ -166,8 +166,13 @@ GOST_USERNAME=myusername GOST_PASSWORD=mySecurePassword123 docker-compose up -d
 # Get Colima VM IP
 colima list
 
-# Test with VM IP instead
-curl -x socks5://192.168.5.2:40000 https://www.cloudflare.com/cdn-cgi/trace
+# Test with VM IP for IPv6 proxy
+curl --socks5-hostname 127.0.0.1:40000 -6 "https://[2606:4700:4700::1111]/cdn-cgi/trace"
+curl -x 127.0.0.1:40001 -6 "https://[2606:4700:4700::1111]/cdn-cgi/trace"
+
+curl --socks5-hostname 127.0.0.1:40000 -6 "https://www.cloudflare.com/cdn-cgi/trace"
+curl -x 127.0.0.1:40001 -6 "https://www.cloudflare.com/cdn-cgi/trace"
+
 ```
 
 ## Files
