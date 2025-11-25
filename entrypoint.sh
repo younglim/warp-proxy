@@ -102,16 +102,13 @@ fi
 
 # Detect if WARP SOCKS5 is listening on ::1:1080
 if ss -ltn | grep -q 'LISTEN.*[::]:1080'; then
-    FORWARD_ADDR="socks5://[::1]:1080"
+    FORWARD_ADDR="socks5://[::1]:1080?prefer=ipv6"
 else
-    FORWARD_ADDR="socks5://127.0.0.1:1080"
+    FORWARD_ADDR="socks5://127.0.0.1:1080?prefer=ipv6"
 fi
 
-if echo "${FORWARD_ADDR}" | grep -q '?'; then
-    HTTP_FORWARD_ADDR="${FORWARD_ADDR}&resolver=prefer_ipv6"
-else
-    HTTP_FORWARD_ADDR="${FORWARD_ADDR}?resolver=prefer_ipv6"
-fi
+# Use the same forward address for HTTP proxy (prefer IPv6 already set)
+HTTP_FORWARD_ADDR="${FORWARD_ADDR}"
 
 declare -a PROXY_PIDS=()
 
@@ -146,7 +143,7 @@ if ip -6 addr show | grep -q 'inet6'; then
     echo "Starting SOCKS5 gost with listener ${LISTEN_ADDR} forwarding to ${FORWARD_ADDR}"
     start_gost_proxy "SOCKS5-dual" -L "${LISTEN_ADDR}" -F "${FORWARD_ADDR}"
 
-    HTTP_LISTEN_ADDR="http://${AUTH}[::]:${HTTP_PORT}?resolver=prefer_ipv6"
+    HTTP_LISTEN_ADDR="http://${AUTH}[::]:${HTTP_PORT}"
     echo "Starting HTTP proxy on ${HTTP_LISTEN_ADDR} chaining through ${HTTP_FORWARD_ADDR}"
     start_gost_proxy "HTTP-dual" -L "${HTTP_LISTEN_ADDR}" -F "${HTTP_FORWARD_ADDR}"
 else
@@ -155,7 +152,7 @@ else
     echo "Starting SOCKS5 gost with listener ${LISTEN_ADDR} forwarding to ${FORWARD_ADDR}"
     start_gost_proxy "SOCKS5-IPv4" -L "${LISTEN_ADDR}" -F "${FORWARD_ADDR}"
 
-    HTTP_LISTEN_ADDR="http://${AUTH}0.0.0.0:${HTTP_PORT}?resolver=prefer_ipv6"
+    HTTP_LISTEN_ADDR="http://${AUTH}0.0.0.0:${HTTP_PORT}"
     echo "Starting HTTP proxy on ${HTTP_LISTEN_ADDR} chaining through ${HTTP_FORWARD_ADDR}"
     start_gost_proxy "HTTP-IPv4" -L "${HTTP_LISTEN_ADDR}" -F "${HTTP_FORWARD_ADDR}"
 fi
