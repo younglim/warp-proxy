@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   warp-proxy:
     build: .
@@ -11,9 +9,12 @@ services:
       - SYS_ADMIN
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv6.conf.default.disable_ipv6=0
+      - net.ipv6.conf.lo.disable_ipv6=0
       - net.ipv4.conf.all.src_valid_mark=1
     ports:
       - "40000:40000"
+      # Note: Docker/Colima on macOS may not expose IPv6 ports to the host even if enabled here.
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
     tmpfs:
@@ -25,5 +26,16 @@ services:
       # - WARP_LICENSE_KEY=your-license-key-here
       - PROXY_PORT=40000
       - RUST_LOG=info  # Change from 'error' to 'info' to hide this specific error
+      # Credentials for gost (replace with strong values). These are provided as
+      # environment variables so gost or a wrapper script can pick them up at
+      # container start time.
+      - GOST_USERNAME=b81de33f-9534-490b-be8d-7da71a3f5474
+      - GOST_PASSWORD=ya0dd5aa6-8f07-471a-8a00-bdd187b9b8a7
     security_opt:
       - seccomp:unconfined
+    # Optional: Add a healthcheck for the proxy port
+    healthcheck:
+      test: ["CMD-SHELL", "ss -ltn | grep -q ':40000' || exit 1"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
