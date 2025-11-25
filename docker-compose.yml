@@ -13,7 +13,8 @@ services:
       - net.ipv6.conf.lo.disable_ipv6=0
       - net.ipv4.conf.all.src_valid_mark=1
     ports:
-      - "40000:40000"
+      - "40000:40000"  # SOCKS5 proxy
+      - "40001:40001"  # HTTP proxy
       # Note: Docker/Colima on macOS may not expose IPv6 ports to the host even if enabled here.
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
@@ -25,12 +26,11 @@ services:
       # Optional: Add your WARP+ license key
       # - WARP_LICENSE_KEY=your-license-key-here
       - PROXY_PORT=40000
+      - HTTP_PROXY_PORT=40001
       - RUST_LOG=info  # Change from 'error' to 'info' to hide this specific error
-      # Credentials for gost (replace with strong values). These are provided as
-      # environment variables so gost or a wrapper script can pick them up at
-      # container start time.
-      - GOST_USERNAME=b81de33f-9534-490b-be8d-7da71a3f5474
-      - GOST_PASSWORD=ya0dd5aa6-8f07-471a-8a00-bdd187b9b8a7
+      # Optional: Uncomment and set credentials to enable authentication
+      # - GOST_USERNAME=your-username-here
+      # - GOST_PASSWORD=your-password-here
     security_opt:
       - seccomp:unconfined
     # Optional: Add a healthcheck for the proxy port

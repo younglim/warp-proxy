@@ -85,6 +85,7 @@ curl -6 -s https://[2606:4700:4700::1111]/cdn-cgi/trace || echo "IPv6 outbound t
 echo "Starting SOCKS5 relay on 0.0.0.0:40000 forwarding to 127.0.0.1:1080..."
 # Use PROXY_PORT env var if provided (default 40000)
 PORT=${PROXY_PORT:-40000}
+HTTP_PORT=${HTTP_PROXY_PORT:-40001}
 
 # If username and password are provided, include them in the listener URL so
 # gost enforces authentication. Note: credentials should be URL-safe (avoid
@@ -102,15 +103,32 @@ else
     FORWARD_ADDR="socks5://127.0.0.1:1080"
 fi
 
+# Start SOCKS5 proxy (IPv4)
+LISTEN_ADDR="socks5://${AUTH}0.0.0.0:${PORT}"
+echo "Starting SOCKS5 gost with listener ${LISTEN_ADDR} forwarding to ${FORWARD_ADDR}"
+gost -L "${LISTEN_ADDR}" -F "${FORWARD_ADDR}" --prefer-ipv6 2>&1 | grep -vE "WARN|power_notifier" &
+
+# Start HTTP proxy (IPv4)
+HTTP_LISTEN_ADDR="http://${AUTH}0.0.0.0:${HTTP_PORT}"
+echo "Starting HTTP proxy on ${HTTP_LISTEN_ADDR} forwarding to ${FORWARD_ADDR}"
+gost -L "${HTTP_LISTEN_ADDR}" -F "${FORWARD_ADDR}" --prefer-ipv6 2>&1 | grep -vE "WARN|power_notifier" &
+
 # Detect if IPv6 is available in the container
 if ip -6 addr show | grep -q 'inet6'; then
+    echo "IPv6 detected, starting gost on [::]:${PORT} and [::]:${HTTP_PORT} as well."
+    
+    # Start SOCKS5 for IPv6
     IPV6_LISTEN_ADDR="socks5://${AUTH}[::]:${PORT}"
-    echo "IPv6 detected, starting gost on [::]:${PORT} as well."
-    # Start gost for IPv6 in background, using correct FORWARD_ADDR
     gost -L "${IPV6_LISTEN_ADDR}" -F "${FORWARD_ADDR}" 2>&1 | grep -vE "WARN|power_notifier" &
+    
+    # Start HTTP for IPv6
+    HTTP_IPV6_LISTEN_ADDR="http://${AUTH}[::]:${HTTP_PORT}"
+    gost -L "${HTTP_IPV6_LISTEN_ADDR}" -F "${FORWARD_ADDR}" 2>&1 | grep -vE "WARN|power_notifier" &
 fi
 
-LISTEN_ADDR="socks5://${AUTH}0.0.0.0:${PORT}"
+echo "Proxy servers started:"
+echo "  - SOCKS5: 0.0.0.0:${PORT}"
+echo "  - HTTP: 0.0.0.0:${HTTP_PORT}"
 
-echo "Starting gost with listener ${LISTEN_ADDR} forwarding to ${FORWARD_ADDR}"
-exec gost -L "${LISTEN_ADDR}" -F "${FORWARD_ADDR}" --prefer-ipv6 2>&1 | grep -vE "WARN|power_notifier" || true
+# Keep container running and show logs
+wait

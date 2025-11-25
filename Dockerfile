@@ -48,9 +48,10 @@ RUN apt update && \
 # The WARP SOCKS5 proxy runs on localhost:1080 by default.
 # We expose port 40000 externally and use gost to forward to WARP's 127.0.0.1:1080
 ENV PROXY_PORT=40000
+ENV HTTP_PROXY_PORT=40001
 
-# Expose the SOCKS5 proxy port (external port)
-EXPOSE ${PROXY_PORT}
+# Expose the SOCKS5 and HTTP proxy ports (external ports)
+EXPOSE ${PROXY_PORT} ${HTTP_PROXY_PORT}
 
 # Set the entrypoint to run multiple services (WARP daemon + proxy relay)
 # The entrypoint script will handle WARP registration and connection.

@@ -153,6 +153,11 @@ docker-compose restart
 docker-compose down
 docker-compose build --no-cache
 docker-compose up -d
+
+# With authentication
+docker-compose down
+docker-compose build --no-cache
+GOST_USERNAME=myusername GOST_PASSWORD=mySecurePassword123 docker-compose up -d
 ```
 
 ### Cannot Connect from macOS Host
