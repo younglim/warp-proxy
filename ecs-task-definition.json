@@ -1,0 +1,42 @@
+{
+  "family": "warp-proxy",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "containerDefinitions": [
+    {
+      "name": "warp-proxy",
+      "image": "<your-docker-image-repo>:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 40000,
+          "hostPort": 40000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "PROXY_PORT",
+          "value": "40000"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/warp-proxy",
+          "awslogs-region": "<your-region>",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "linuxParameters": {
+        "capabilities": {
+          "drop": ["ALL"]
+        }
+      }
+    }
+  ],
+  "executionRoleArn": "<your-ecs-execution-role-arn>",
+  "taskRoleArn": "<your-ecs-task-role-arn>"
+}

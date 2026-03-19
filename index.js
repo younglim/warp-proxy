@@ -57,11 +57,40 @@ BindAddress = 0.0.0.0:${port}
 
         fs.writeFileSync('wireproxy.conf', wireproxyConf);
 
+        // Diagnostic: Log wireproxy.conf contents
+        console.log('wireproxy.conf contents:\n', wireproxyConf);
+
+        // Diagnostic: Check endpoint reachability
+        const endpointHost = endpointMatch[1].split(':')[0];
+        console.log(`Checking UDP connectivity to WireGuard endpoint: ${endpointHost}`);
+        try {
+            await exec(`nc -zvu ${endpointHost} 51820`);
+            console.log('UDP connectivity to endpoint looks OK.');
+        } catch (e) {
+            console.warn('UDP connectivity check failed:', e.message);
+        }
+
+        // Diagnostic: Check if port is available
+        try {
+            await exec(`lsof -i :${port}`);
+            console.log(`Port ${port} is available.`);
+        } catch (e) {
+            console.warn(`Port ${port} may not be available or lsof not installed:`, e.message);
+        }
+
         console.log(`Starting wireproxy in user-space on port ${port}...`);
         const child = spawn('wireproxy', ['-c', 'wireproxy.conf'], { stdio: 'inherit' });
 
         // Wait slightly to ensure process doesn't instantly crash before resolving
         await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Diagnostic: Check if wireproxy is running
+        try {
+            await exec('pgrep wireproxy');
+            console.log('wireproxy process is running.');
+        } catch (e) {
+            console.warn('wireproxy process not found:', e.message);
+        }
 
         return child;
     } finally {
