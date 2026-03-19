@@ -1,190 +1,50 @@
-# WARP Proxy Docker Container
+# Cloudflare WARP SOCKS5 Proxy (Fargate Compatible)
 
-A Dockerized Cloudflare WARP client that exposes a SOCKS5 proxy on port 40000.
+A lightweight Docker container that connects to Cloudflare WARP and exposes it locally as a **SOCKS5 proxy**. 
 
-## Prerequisites
+Unlike the official Cloudflare WARP Linux client which requires root-level kernel privileges (`NET_ADMIN` and `/dev/net/tun`), this implementation uses [`wireproxy`](https://github.com/octeep/wireproxy) and [`wgcf`](https://github.com/ViRb3/wgcf) to run entirely in user-space.
 
-- macOS with [Colima](https://github.com/abiosoft/colima) installed
-- Docker or Docker Compose
+This makes it **100% compatible with AWS ECS Fargate** and strictly sandboxed environments.
 
-## Quick Start
+## Features
+- **Zero Privileges Required**: Drops all Linux capabilities (`cap_drop: ALL`). No `NET_ADMIN` needed.
+- **Auto-Registration**: Automatically provisions a free Cloudflare WARP account on startup.
+- **Alpine Base**: Extremely slim image size.
+- **SOCKS5 Proxy**: Binds to `0.0.0.0:40000` by default.
 
-### 1. Start Colima
+## Quick Start (Local)
 
-```bash
-# Stop any running instance
-colima stop
+1. Start the proxy using Docker Compose:
+   ```bash
+   docker-compose up --build -d
+   ```
 
-# Start Colima (let host WARP handle DNS if you have company WARP)
-colima start --network-address
-```
+2. Test the connection through the proxy:
+   ```bash
+   curl --socks5 127.0.0.1:40000 https://cloudflare.com/cdn-cgi/trace
+   ```
+   *Look for `warp=on` in the output to confirm traffic is being routed through Cloudflare.*
 
-### 2. Build and Run
+3. In your web browser or application, configure your **SOCKS5 proxy** to point to `127.0.0.1:40000`.
 
-```bash
-# Using Docker Compose (recommended)
-docker-compose up -d
+## Connecting from other devices
+To allow other machines to connect to your proxy, configure their SOCKS5 settings to point to your Docker host's IP address (e.g., `192.168.1.100:40000`).
 
-# OR using Docker directly
-docker build -t warp-proxy .
-docker run -d \
-  --name warp-proxy \
-  --cap-add NET_ADMIN \
-  --cap-add SYS_MODULE \
-  --sysctl net.ipv6.conf.all.disable_ipv6=0 \
-  --sysctl net.ipv4.conf.all.src_valid_mark=1 \
-  -p 40000:40000 \
-  warp-proxy
-```
+## Environment Variables
+| Variable | Default  | Description |
+|----------|----------|-------------|
+| `PROXY_PORT` | `40000` | The port where the SOCKS5 proxy will be exposed. |
 
-### 3. Test the Proxy
+## AWS ECS Fargate Deployment Guide
 
-```bash
-# Test connection
-curl -x socks5://localhost:40000 https://www.cloudflare.com/cdn-cgi/trace
+Because this container runs entirely in user-space, it is natively compatible with AWS Fargate. 
 
-# You should see: warp=on or warp=plus
-```
-
-## Usage
-
-### View Logs
-
-```bash
-# Docker Compose
-docker-compose logs -f
-
-# Docker
-docker logs -f warp-proxy
-```
-
-### Stop/Start Container
-
-```bash
-# Docker Compose
-docker-compose down
-docker-compose up -d
-
-# Docker
-docker stop warp-proxy
-docker start warp-proxy
-```
-
-### Rebuild After Changes
-
-```bash
-# Docker Compose
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
-
-# Docker
-docker stop warp-proxy
-docker rm warp-proxy
-docker build -t warp-proxy .
-docker run -d --name warp-proxy [... flags ...] warp-proxy
-```
-
-## ⚠️ Company WARP Conflict
-
-If you have company WARP installed on your macOS host, you **cannot** run both simultaneously due to DNS conflicts.
-
-### Choose One:
-
-**Option A: Use Container WARP (Personal/Testing)**
-1. Turn OFF company WARP on macOS
-2. Start container: `docker-compose up -d`
-3. Use proxy: `socks5://localhost:40000`
-
-**Option B: Use Company WARP (Work)**
-1. Stop container: `docker-compose down`
-2. Turn ON company WARP on macOS
-
-### Solution: Deploy on Separate Machine
-
-For simultaneous use, deploy this container on:
-- A Linux VPS (DigitalOcean, AWS, etc.)
-- A Raspberry Pi
-- Another Mac without company WARP
-
-## Configuration
-
-### WARP+ License (Optional)
-
-Add your WARP+ license key in `docker-compose.yml`:
-
-```yaml
-environment:
-  - WARP_LICENSE_KEY=your-license-key-here
-```
-
-### Custom Proxy Port
-
-Change the port in `docker-compose.yml`:
-
-```yaml
-environment:
-  - PROXY_PORT=40000  # Change this
-ports:
-  - "40000:40000"     # Change this too
-```
-
-## Troubleshooting
-
-### Port Already in Use
-
-```bash
-# Find what's using port 40000
-lsof -i :40000
-
-# Kill the process or change the port
-```
-
-### Container Won't Connect to WARP
-
-```bash
-# Check logs
-docker-compose logs -f
-
-# Restart container
-docker-compose restart
-
-# Rebuild from scratch
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
-
-# With authentication
-docker-compose down
-docker-compose build --no-cache
-GOST_USERNAME=myusername GOST_PASSWORD=mySecurePassword123 docker-compose up -d
-```
-
-### Cannot Connect from macOS Host
-
-```bash
-# Get Colima VM IP
-colima list
-
-# Test with VM IP for IPv6 proxy
-curl --socks5-hostname 127.0.0.1:40000 -6 "https://[2606:4700:4700::1111]/cdn-cgi/trace"
-curl -x 127.0.0.1:40001 -6 "https://[2606:4700:4700::1111]/cdn-cgi/trace"
-
-curl --socks5-hostname 127.0.0.1:40000 -6 "https://www.cloudflare.com/cdn-cgi/trace"
-curl -x 127.0.0.1:40001 -6 "https://www.cloudflare.com/cdn-cgi/trace"
-
-```
-
-## Files
-
-- `Dockerfile` - Container image definition
-- `docker-compose.yml` - Docker Compose configuration
-- `entrypoint.sh` - Startup script that configures WARP
-- `README.md` - This file
-
-## License
-
-MIT
+**Task Definition Requirements:**
+1. **No Capabilities**: You do not need to specify `linuxParameters` or capabilities in your task definition.
+2. **Security Groups**:
+   - **Egress (Outbound)**: You must allow **UDP Port 2408** to `0.0.0.0/0` (Wireguard/WARP traffic) and standard HTTPS (TCP 443) for initial account registration.
+   - **Ingress (Inbound)**: Allow **TCP Port 40000** from your internal VPC or trusted clients to access the proxy.
+3. **Networking**: Ensure your Fargate task is in a private subnet with a NAT gateway attached, or in a public subnet with a public IP assigned so it can reach Cloudflare's edge network.
 
 
 
