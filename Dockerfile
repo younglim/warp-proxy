@@ -2,7 +2,7 @@ FROM node:24-bullseye-slim
 
 # Install dependencies (Node slim images use apt-get)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl wget bash jq ca-certificates lsof procps && \
+    apt-get install -y --no-install-recommends curl wget bash jq ca-certificates lsof procps netcat-openbsd && \
     rm -rf /var/lib/apt/lists/*
 
 # Install wgcf (WARP config generator)

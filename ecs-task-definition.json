@@ -38,5 +38,4 @@
     }
   ],
   "executionRoleArn": "<your-ecs-execution-role-arn>",
-  "taskRoleArn": "<your-ecs-task-role-arn>"
 }

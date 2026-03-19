@@ -88,11 +88,28 @@ BindAddress = 0.0.0.0:${port}
         try {
             await exec('pgrep wireproxy');
             console.log('wireproxy process is running.');
+
+            // After starting wireproxy, test SOCKS5 proxy with curl
+            try {
+                const curlCmd = `curl --socks5 127.0.0.1:${port} --max-time 5 https://cloudflare.com/cdn-cgi/trace`;
+                console.log(`Testing SOCKS5 proxy with: ${curlCmd}`);
+                const { stdout, stderr } = await exec(curlCmd);
+                if (stdout) {
+                    console.log('SOCKS5 proxy test output:\n', stdout);
+                }
+                if (stderr) {
+                    console.warn('SOCKS5 proxy test error:\n', stderr);
+                }
+            } catch (e) {
+                console.error('SOCKS5 proxy test failed:', e.message);
+            }
         } catch (e) {
             console.warn('wireproxy process not found:', e.message);
         }
 
+
         return child;
+
     } finally {
         process.chdir(originalDir);
     }
