@@ -19,6 +19,7 @@ ENV PROXY_PORT=40000
 
 EXPOSE ${PROXY_PORT}
 
-COPY entrypoint.js /usr/local/bin/entrypoint.js
+WORKDIR /app
+COPY index.js /app/index.js
 
-ENTRYPOINT ["node", "/usr/local/bin/entrypoint.js"]
+ENTRYPOINT ["node", "/app/index.js"]
