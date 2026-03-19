@@ -3,11 +3,12 @@ services:
   warp-proxy:
     build: .
     container_name: warp-proxy
-    cap_add:
-      - NET_ADMIN
-      - SYS_ADMIN
-    devices:
-      - /dev/net/tun:/dev/net/tun
+    # Explicitly drop all Linux kernel capabilities
+    cap_drop:
+      - ALL
+    # Prevent the container from gaining new privileges
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "40000:40000"
     environment:
