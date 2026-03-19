@@ -1,4 +1,4 @@
-FROM node:24-slim
+FROM node:24-bullseye-slim
 
 # Install dependencies (Node slim images use apt-get)
 RUN apt-get update && \
@@ -19,7 +19,6 @@ ENV PROXY_PORT=40000
 
 EXPOSE ${PROXY_PORT}
 
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+COPY entrypoint.js /usr/local/bin/entrypoint.js
 
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+ENTRYPOINT ["node", "/usr/local/bin/entrypoint.js"]
