@@ -1,7 +1,9 @@
-FROM alpine:latest
+FROM node:24-slim
 
-# Install dependencies
-RUN apk add --no-cache curl wget bash jq
+# Install dependencies (Node slim images use apt-get)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl wget bash jq ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install wgcf (WARP config generator)
 RUN curl -fsSL "https://github.com/ViRb3/wgcf/releases/download/v2.2.22/wgcf_2.2.22_linux_amd64" -o /usr/local/bin/wgcf && \
